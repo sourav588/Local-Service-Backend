@@ -16,7 +16,7 @@ app.use(express.json());
 /* ---------- MongoDB Connection ---------- */
 
 const MONGO_URI =
-  process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/localServiceDB";
+  process.env.MONGODB_URI || "mongodb+srv://sourav801600_db_user:g0Szose7aCEilTYm@cluster0.ame8bcn.mongodb.netn/localServiceDB";
 
 mongoose
   .connect(MONGO_URI)
