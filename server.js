@@ -9,44 +9,36 @@ const User = require("./models/User");
 const app = express();
 
 /* ---------- Middleware ---------- */
+
 app.use(cors());
 app.use(express.json());
 
 /* ---------- MongoDB Connection ---------- */
+
 const MONGO_URI =
-  process.env.MONGODB_URI ||
-  "mongodb+srv://sourav801600_db_user:g0Szose7aCEilTYm@cluster0.ame8bcn.mongodb.net/localServiceDB";
+  process.env.MONGODB_URI || "mongodb+srv://sourav801600_db_user:Cc5CRknoqFueF05D@myservise.91oxfrm.mongodb.net/?appName=myservise";
 
 mongoose
   .connect(MONGO_URI)
-  .then(() => console.log("MongoDB Connected ✅"))
-  .catch((err) => console.log("MongoDB Error ❌:", err));
+  .then(() => console.log("MongoDB Connected"))
+  .catch((err) => console.log("MongoDB Error:", err));
 
-/* ---------- Health Check ---------- */
+/* ---------- Test Route ---------- */
+
 app.get("/", (req, res) => {
-  res.send("API Running 🚀");
+  res.send("API Running");
 });
 
-/* ---------- ORDER API ---------- */
+/* ---------- Save Order ---------- */
 
-// create order
-app.post("/api/order", async (req, res) => {
+app.post("/order-service", async (req, res) => {
   try {
-    const { name, phone, address, service, price } = req.body;
-
-    if (!name || !phone || !service) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields",
-      });
-    }
-
     const order = new Order({
-      name,
-      phone,
-      address,
-      service,
-      price,
+      name: req.body.name,
+      phone: req.body.phone,
+      address: req.body.address,
+      service: req.body.service,
+      price: req.body.price,
     });
 
     await order.save();
@@ -56,7 +48,7 @@ app.post("/api/order", async (req, res) => {
       message: "Order placed successfully",
     });
   } catch (error) {
-    console.log("Order Error:", error);
+    console.log("Order Save Error:", error);
 
     res.status(500).json({
       success: false,
@@ -65,8 +57,9 @@ app.post("/api/order", async (req, res) => {
   }
 });
 
-// get all orders
-app.get("/api/orders", async (req, res) => {
+/* ---------- Get All Orders ---------- */
+
+app.get("/orders", async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
 
@@ -84,20 +77,13 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 
-/* ---------- USER API ---------- */
+/* ---------- User Registration ---------- */
 
-// register
-app.post("/api/register", async (req, res) => {
+app.post("/register", async (req, res) => {
   try {
     const { name, email, phone, password, address } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields required",
-      });
-    }
-
+    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -106,6 +92,7 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
+    // Create new user
     const user = new User({
       name,
       email,
@@ -131,26 +118,47 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// login
-app.post("/api/login", async (req, res) => {
+/* ---------- User Login ---------- */
+
+app.post("/login", async (req, res) => {
+  console.log("Login request received:", req.body);
+
   try {
     const { email, password } = req.body;
 
+    // Validate input
     if (!email || !password) {
+      console.log("Missing email or password");
       return res.status(400).json({
         success: false,
-        message: "Email and password required",
+        message: "Email and password are required",
       });
     }
 
-    const user = await User.findOne({ email });
+    console.log("Looking for user:", email);
 
-    if (!user || user.password !== password) {
+    // Find user by email and include password field
+    const user = await User.findOne({ email }).select("+password");
+    console.log("User found:", user ? "Yes" : "No");
+
+    if (!user) {
+      console.log("User not found");
       return res.status(401).json({
         success: false,
-        message: "Invalid credentials",
+        message: "Invalid email or password",
       });
     }
+
+    // Check password (simple comparison - in production use bcrypt)
+    if (user.password !== password) {
+      console.log("Password mismatch");
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    console.log("Login successful for user:", user.name);
 
     res.json({
       success: true,
@@ -174,8 +182,9 @@ app.post("/api/login", async (req, res) => {
 });
 
 /* ---------- Start Server ---------- */
-const PORT = process.env.PORT || 4000;
+
+const PORT = 4000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} 🚀`);
+  console.log(`Server running on port ${PORT}`);
 });
