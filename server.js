@@ -9,36 +9,44 @@ const User = require("./models/User");
 const app = express();
 
 /* ---------- Middleware ---------- */
-
 app.use(cors());
 app.use(express.json());
 
 /* ---------- MongoDB Connection ---------- */
-
 const MONGO_URI =
-  process.env.MONGODB_URI || "mongodb+srv://sourav801600_db_user:g0Szose7aCEilTYm@cluster0.ame8bcn.mongodb.netn/localServiceDB";
+  process.env.MONGODB_URI ||
+  "mongodb+srv://sourav801600_db_user:g0Szose7aCEilTYm@cluster0.ame8bcn.mongodb.net/localServiceDB";
 
 mongoose
   .connect(MONGO_URI)
-  .then(() => console.log("MongoDB Connected"))
-  .catch((err) => console.log("MongoDB Error:", err));
+  .then(() => console.log("MongoDB Connected ✅"))
+  .catch((err) => console.log("MongoDB Error ❌:", err));
 
-/* ---------- Test Route ---------- */
-
+/* ---------- Health Check ---------- */
 app.get("/", (req, res) => {
-  res.send("API Running");
+  res.send("API Running 🚀");
 });
 
-/* ---------- Save Order ---------- */
+/* ---------- ORDER API ---------- */
 
-app.post("/order-service", async (req, res) => {
+// create order
+app.post("/api/order", async (req, res) => {
   try {
+    const { name, phone, address, service, price } = req.body;
+
+    if (!name || !phone || !service) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
+
     const order = new Order({
-      name: req.body.name,
-      phone: req.body.phone,
-      address: req.body.address,
-      service: req.body.service,
-      price: req.body.price,
+      name,
+      phone,
+      address,
+      service,
+      price,
     });
 
     await order.save();
@@ -48,7 +56,7 @@ app.post("/order-service", async (req, res) => {
       message: "Order placed successfully",
     });
   } catch (error) {
-    console.log("Order Save Error:", error);
+    console.log("Order Error:", error);
 
     res.status(500).json({
       success: false,
@@ -57,9 +65,8 @@ app.post("/order-service", async (req, res) => {
   }
 });
 
-/* ---------- Get All Orders ---------- */
-
-app.get("/orders", async (req, res) => {
+// get all orders
+app.get("/api/orders", async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
 
@@ -77,13 +84,20 @@ app.get("/orders", async (req, res) => {
   }
 });
 
-/* ---------- User Registration ---------- */
+/* ---------- USER API ---------- */
 
-app.post("/register", async (req, res) => {
+// register
+app.post("/api/register", async (req, res) => {
   try {
     const { name, email, phone, password, address } = req.body;
 
-    // Check if user already exists
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields required",
+      });
+    }
+
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -92,7 +106,6 @@ app.post("/register", async (req, res) => {
       });
     }
 
-    // Create new user
     const user = new User({
       name,
       email,
@@ -118,47 +131,26 @@ app.post("/register", async (req, res) => {
   }
 });
 
-/* ---------- User Login ---------- */
-
-app.post("/login", async (req, res) => {
-  console.log("Login request received:", req.body);
-
+// login
+app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
     if (!email || !password) {
-      console.log("Missing email or password");
       return res.status(400).json({
         success: false,
-        message: "Email and password are required",
+        message: "Email and password required",
       });
     }
 
-    console.log("Looking for user:", email);
+    const user = await User.findOne({ email });
 
-    // Find user by email and include password field
-    const user = await User.findOne({ email }).select("+password");
-    console.log("User found:", user ? "Yes" : "No");
-
-    if (!user) {
-      console.log("User not found");
+    if (!user || user.password !== password) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message: "Invalid credentials",
       });
     }
-
-    // Check password (simple comparison - in production use bcrypt)
-    if (user.password !== password) {
-      console.log("Password mismatch");
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    console.log("Login successful for user:", user.name);
 
     res.json({
       success: true,
@@ -182,9 +174,8 @@ app.post("/login", async (req, res) => {
 });
 
 /* ---------- Start Server ---------- */
-
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT} 🚀`);
 });
