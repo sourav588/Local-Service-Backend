@@ -29,50 +29,13 @@ mongoose
 
 /* ---------- Test Route ---------- */
 app.get("/", (req, res) => {
-  res.json({ message: "API Running" }); // ✅ always JSON
-});
-
-/* ---------- Save Order ---------- */
-app.post("/order-service", async (req, res) => {
-  try {
-    const order = new Order(req.body);
-    await order.save();
-
-    res.json({
-      success: true,
-      message: "Order placed successfully",
-    });
-  } catch (error) {
-    console.log("Order Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Order failed",
-    });
-  }
-});
-
-/* ---------- Get Orders ---------- */
-app.get("/orders", async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      data: orders,
-    });
-  } catch (error) {
-    console.log("Fetch Orders Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch orders",
-    });
-  }
+  res.json({ message: "API Running" });
 });
 
 /* ---------- Register ---------- */
 app.post("/register", async (req, res) => {
   try {
-    const { name, email, phone, password, address } = req.body;
+    let { name, email, phone, password, address } = req.body;
 
     if (!name || !email || !phone || !password) {
       return res.status(400).json({
@@ -80,6 +43,9 @@ app.post("/register", async (req, res) => {
         message: "All fields are required",
       });
     }
+
+    // ✅ normalize email
+    email = email.trim().toLowerCase();
 
     const exist = await User.findOne({ email });
     if (exist) {
@@ -118,7 +84,7 @@ app.post("/register", async (req, res) => {
 /* ---------- Login ---------- */
 app.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -127,18 +93,29 @@ app.post("/login", async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email });
+    // ✅ normalize input
+    email = email.trim().toLowerCase();
+    password = password.trim();
 
-    if (!user || !user.password) {
+    // 🔥 IMPORTANT FIX
+    const user = await User.findOne({ email }).select("+password");
+
+    if (!user) {
+      console.log("❌ User not found");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
       });
     }
 
+    console.log("Stored password:", user.password);
+
     const match = await bcrypt.compare(password, user.password);
 
+    console.log("Password match:", match);
+
     if (!match) {
+      console.log("❌ Password mismatch");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -150,6 +127,8 @@ app.post("/login", async (req, res) => {
       process.env.JWT_SECRET || "secret123",
       { expiresIn: "7d" }
     );
+
+    console.log("✅ Login success");
 
     res.json({
       success: true,
@@ -169,7 +148,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ---------- Get User by ID ---------- */
+/* ---------- Get User ---------- */
 app.get("/api/user/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
