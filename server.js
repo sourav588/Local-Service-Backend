@@ -182,17 +182,33 @@ app.post("/login", async (req, res) => {
 });
 
 
-app.get("/api/user", (req, res) => {
-  const id = req.params.id;
+app.get("/api/user/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
 
-  // TEMP TEST DATA
-  res.json({
-    name: "Sourav",
-    email: "sourav@gmail.com",
-    id: id
-  });
+    const user = await User.findById(id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      user
+    });
+
+  } catch (error) {
+    console.log("User Fetch Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
 });
-
 /* ---------- Start Server ---------- */
 
 const PORT = 4000;
