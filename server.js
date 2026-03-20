@@ -16,8 +16,7 @@ app.use(express.json());
 /* ---------- MongoDB Connection ---------- */
 
 const MONGO_URI =
-  process.env.MONGODB_URI ||
-  "mongodb+srv://sourav801600_db_user:Cc5CRknoqFueF05D@myservise.91oxfrm.mongodb.net/?appName=myservise";
+  process.env.MONGODB_URI || "mongodb+srv://sourav801600_db_user:Cc5CRknoqFueF05D@myservise.91oxfrm.mongodb.net/?appName=myservise";
 
 mongoose
   .connect(MONGO_URI)
@@ -34,7 +33,14 @@ app.get("/", (req, res) => {
 
 app.post("/order-service", async (req, res) => {
   try {
-    const order = new Order(req.body);
+    const order = new Order({
+      name: req.body.name,
+      phone: req.body.phone,
+      address: req.body.address,
+      service: req.body.service,
+      price: req.body.price,
+    });
+
     await order.save();
 
     res.json({
@@ -53,11 +59,14 @@ app.post("/order-service", async (req, res) => {
 
 /* ---------- Get All Orders ---------- */
 
-app.get("/api/orders", async (req, res) => {
+app.get("/orders", async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
 
-    res.json(orders); // ✅ direct array (frontend friendly)
+    res.json({
+      success: true,
+      data: orders,
+    });
   } catch (error) {
     console.log("Fetch Orders Error:", error);
 
@@ -70,10 +79,11 @@ app.get("/api/orders", async (req, res) => {
 
 /* ---------- User Registration ---------- */
 
-app.post("/api/register", async (req, res) => {
+app.post("/register", async (req, res) => {
   try {
     const { name, email, phone, password, address } = req.body;
 
+    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -82,6 +92,7 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
+    // Create new user
     const user = new User({
       name,
       email,
@@ -109,18 +120,45 @@ app.post("/api/register", async (req, res) => {
 
 /* ---------- User Login ---------- */
 
-app.post("/api/login", async (req, res) => {
+app.post("/login", async (req, res) => {
+  console.log("Login request received:", req.body);
+
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email }).select("+password");
+    // Validate input
+    if (!email || !password) {
+      console.log("Missing email or password");
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
+    }
 
-    if (!user || user.password !== password) {
+    console.log("Looking for user:", email);
+
+    // Find user by email and include password field
+    const user = await User.findOne({ email }).select("+password");
+    console.log("User found:", user ? "Yes" : "No");
+
+    if (!user) {
+      console.log("User not found");
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
+
+    // Check password (simple comparison - in production use bcrypt)
+    if (user.password !== password) {
+      console.log("Password mismatch");
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    console.log("Login successful for user:", user.name);
 
     res.json({
       success: true,
@@ -143,28 +181,16 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-/* ---------- 🔥 GET USER BY ID (MAIN FIX) ---------- */
 
-app.get("/api/users/:id", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
+app.get("/api/user", (req, res) => {
+  const id = req.params.id;
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    res.json(user);
-  } catch (error) {
-    console.log("Fetch User Error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch user",
-    });
-  }
+  // TEMP TEST DATA
+  res.json({
+    name: "Sourav",
+    email: "sourav@gmail.com",
+    id: id
+  });
 });
 
 /* ---------- Start Server ---------- */
