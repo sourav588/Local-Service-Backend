@@ -32,7 +32,7 @@ app.get("/", (req, res) => {
   res.json({ message: "API Running" });
 });
 
-/* ---------- Register ---------- */
+/* ---------- REGISTER ---------- */
 app.post("/register", async (req, res) => {
   try {
     let { name, email, phone, password, address } = req.body;
@@ -44,7 +44,6 @@ app.post("/register", async (req, res) => {
       });
     }
 
-    // ✅ normalize email
     email = email.trim().toLowerCase();
 
     const exist = await User.findOne({ email });
@@ -81,7 +80,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-/* ---------- Login ---------- */
+/* ---------- LOGIN ---------- */
 app.post("/login", async (req, res) => {
   try {
     let { email, password } = req.body;
@@ -93,29 +92,21 @@ app.post("/login", async (req, res) => {
       });
     }
 
-    // ✅ normalize input
     email = email.trim().toLowerCase();
     password = password.trim();
 
-    // 🔥 IMPORTANT FIX
     const user = await User.findOne({ email }).select("+password");
 
     if (!user) {
-      console.log("❌ User not found");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
       });
     }
 
-    console.log("Stored password:", user.password);
-
     const match = await bcrypt.compare(password, user.password);
 
-    console.log("Password match:", match);
-
     if (!match) {
-      console.log("❌ Password mismatch");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -128,8 +119,6 @@ app.post("/login", async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    console.log("✅ Login success");
-
     res.json({
       success: true,
       token,
@@ -137,6 +126,7 @@ app.post("/login", async (req, res) => {
         userId: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
       },
     });
   } catch (err) {
@@ -148,7 +138,43 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ---------- Get User ---------- */
+/* ---------- PLACE ORDER (🔥 FIX ADDED) ---------- */
+app.post("/order-service", async (req, res) => {
+  try {
+    const { userId, name, phone, address, service, price } = req.body;
+
+    if (!name || !address || !service) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
+
+    const order = new Order({
+      userId,
+      name,
+      phone,
+      address,
+      service,
+      price: price || 0,
+    });
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: "Order placed successfully",
+    });
+  } catch (error) {
+    console.log("Order Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Order failed",
+    });
+  }
+});
+
+/* ---------- GET USER ---------- */
 app.get("/api/user/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
@@ -173,7 +199,26 @@ app.get("/api/user/:id", async (req, res) => {
   }
 });
 
-/* ---------- Start Server ---------- */
+/* ---------- GET USER ORDERS (🔥 BONUS) ---------- */
+app.get("/my-orders/:userId", async (req, res) => {
+  try {
+    const orders = await Order.find({ userId: req.params.userId }).sort({
+      createdAt: -1,
+    });
+
+    res.json({
+      success: true,
+      data: orders,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch orders",
+    });
+  }
+});
+
+/* ---------- START SERVER ---------- */
 const PORT = process.env.PORT || 4000;
 
 app.listen(PORT, () => {
