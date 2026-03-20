@@ -16,7 +16,8 @@ app.use(express.json());
 /* ---------- MongoDB Connection ---------- */
 
 const MONGO_URI =
-  process.env.MONGODB_URI || "mongodb+srv://sourav801600_db_user:Cc5CRknoqFueF05D@myservise.91oxfrm.mongodb.net/?appName=myservise";
+  process.env.MONGODB_URI ||
+  "mongodb+srv://sourav801600_db_user:Cc5CRknoqFueF05D@myservise.91oxfrm.mongodb.net/?appName=myservise";
 
 mongoose
   .connect(MONGO_URI)
@@ -33,14 +34,7 @@ app.get("/", (req, res) => {
 
 app.post("/order-service", async (req, res) => {
   try {
-    const order = new Order({
-      name: req.body.name,
-      phone: req.body.phone,
-      address: req.body.address,
-      service: req.body.service,
-      price: req.body.price,
-    });
-
+    const order = new Order(req.body);
     await order.save();
 
     res.json({
@@ -59,14 +53,11 @@ app.post("/order-service", async (req, res) => {
 
 /* ---------- Get All Orders ---------- */
 
-app.get("/orders", async (req, res) => {
+app.get("/api/orders", async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
 
-    res.json({
-      success: true,
-      data: orders,
-    });
+    res.json(orders); // ✅ direct array (frontend friendly)
   } catch (error) {
     console.log("Fetch Orders Error:", error);
 
@@ -79,11 +70,10 @@ app.get("/orders", async (req, res) => {
 
 /* ---------- User Registration ---------- */
 
-app.post("/register", async (req, res) => {
+app.post("/api/register", async (req, res) => {
   try {
     const { name, email, phone, password, address } = req.body;
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -92,7 +82,6 @@ app.post("/register", async (req, res) => {
       });
     }
 
-    // Create new user
     const user = new User({
       name,
       email,
@@ -120,45 +109,18 @@ app.post("/register", async (req, res) => {
 
 /* ---------- User Login ---------- */
 
-app.post("/login", async (req, res) => {
-  console.log("Login request received:", req.body);
-
+app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
-    if (!email || !password) {
-      console.log("Missing email or password");
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required",
-      });
-    }
-
-    console.log("Looking for user:", email);
-
-    // Find user by email and include password field
     const user = await User.findOne({ email }).select("+password");
-    console.log("User found:", user ? "Yes" : "No");
 
-    if (!user) {
-      console.log("User not found");
+    if (!user || user.password !== password) {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
-
-    // Check password (simple comparison - in production use bcrypt)
-    if (user.password !== password) {
-      console.log("Password mismatch");
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    console.log("Login successful for user:", user.name);
 
     res.json({
       success: true,
@@ -177,6 +139,30 @@ app.post("/login", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Login failed",
+    });
+  }
+});
+
+/* ---------- 🔥 GET USER BY ID (MAIN FIX) ---------- */
+
+app.get("/api/users/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.log("Fetch User Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch user",
     });
   }
 });
