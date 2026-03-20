@@ -11,12 +11,10 @@ const User = require("./models/User");
 const app = express();
 
 /* ---------- Middleware ---------- */
-
 app.use(cors());
 app.use(express.json());
 
 /* ---------- MongoDB Connection ---------- */
-
 const MONGO_URI =
   process.env.MONGODB_URI ||
   "mongodb+srv://sourav801600_db_user:Cc5CRknoqFueF05D@myservise.91oxfrm.mongodb.net/?appName=myservise";
@@ -24,45 +22,54 @@ const MONGO_URI =
 mongoose
   .connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.log("❌ MongoDB Error:", err));
+  .catch((err) => {
+    console.log("❌ MongoDB Error:", err);
+    process.exit(1);
+  });
 
 /* ---------- Test Route ---------- */
-
 app.get("/", (req, res) => {
-  res.send("🚀 API Running");
+  res.json({ message: "API Running" }); // ✅ always JSON
 });
 
-/* ---------- AUTH MIDDLEWARE ---------- */
-
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    return res.status(401).json({
-      success: false,
-      message: "No token provided",
-    });
-  }
-
+/* ---------- Save Order ---------- */
+app.post("/order-service", async (req, res) => {
   try {
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "secret123"
-    );
+    const order = new Order(req.body);
+    await order.save();
 
-    req.user = decoded;
-    next();
+    res.json({
+      success: true,
+      message: "Order placed successfully",
+    });
   } catch (error) {
-    return res.status(401).json({
+    console.log("Order Error:", error);
+    res.status(500).json({
       success: false,
-      message: "Invalid token",
+      message: "Order failed",
     });
   }
-};
+});
 
-/* ---------- REGISTER ---------- */
+/* ---------- Get Orders ---------- */
+app.get("/orders", async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
 
+    res.json({
+      success: true,
+      data: orders,
+    });
+  } catch (error) {
+    console.log("Fetch Orders Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch orders",
+    });
+  }
+});
+
+/* ---------- Register ---------- */
 app.post("/register", async (req, res) => {
   try {
     const { name, email, phone, password, address } = req.body;
@@ -74,16 +81,15 @@ app.post("/register", async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({ email });
-
-    if (existingUser) {
+    const exist = await User.findOne({ email });
+    if (exist) {
       return res.status(400).json({
         success: false,
         message: "Email already registered",
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = new User({
       name,
@@ -100,9 +106,8 @@ app.post("/register", async (req, res) => {
       message: "User registered successfully",
       userId: user._id,
     });
-  } catch (error) {
-    console.log("Register Error:", error);
-
+  } catch (err) {
+    console.log("Register Error:", err);
     res.status(500).json({
       success: false,
       message: "Registration failed",
@@ -110,8 +115,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-/* ---------- LOGIN ---------- */
-
+/* ---------- Login ---------- */
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -119,49 +123,45 @@ app.post("/login", async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Email and password required",
+        message: "Email & password required",
       });
     }
 
-    const user = await User.findOne({ email }).select("+password");
+    const user = await User.findOne({ email });
 
-    if (!user) {
+    if (!user || !user.password) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message: "Invalid credentials",
       });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const match = await bcrypt.compare(password, user.password);
 
-    if (!isMatch) {
+    if (!match) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message: "Invalid credentials",
       });
     }
 
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET || "secret123",
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
 
     res.json({
       success: true,
-      message: "Login successful",
       token,
       user: {
         userId: user._id,
         name: user.name,
         email: user.email,
-        phone: user.phone,
-        address: user.address,
       },
     });
-  } catch (error) {
-    console.log("Login Error:", error);
-
+  } catch (err) {
+    console.log("Login Error:", err);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -169,8 +169,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ---------- GET USER BY ID ---------- */
-
+/* ---------- Get User by ID ---------- */
 app.get("/api/user/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
@@ -186,9 +185,8 @@ app.get("/api/user/:id", async (req, res) => {
       success: true,
       user,
     });
-  } catch (error) {
-    console.log("User Fetch Error:", error);
-
+  } catch (err) {
+    console.log("User Fetch Error:", err);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -196,56 +194,7 @@ app.get("/api/user/:id", async (req, res) => {
   }
 });
 
-/* ---------- SAVE ORDER ---------- */
-
-app.post("/order-service", async (req, res) => {
-  try {
-    const order = new Order({
-      name: req.body.name,
-      phone: req.body.phone,
-      address: req.body.address,
-      service: req.body.service,
-      price: req.body.price,
-    });
-
-    await order.save();
-
-    res.json({
-      success: true,
-      message: "Order placed successfully",
-    });
-  } catch (error) {
-    console.log("Order Error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Order failed",
-    });
-  }
-});
-
-/* ---------- GET ALL ORDERS (PROTECTED) ---------- */
-
-app.get("/orders", authMiddleware, async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      data: orders,
-    });
-  } catch (error) {
-    console.log("Fetch Orders Error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch orders",
-    });
-  }
-});
-
-/* ---------- START SERVER ---------- */
-
+/* ---------- Start Server ---------- */
 const PORT = process.env.PORT || 4000;
 
 app.listen(PORT, () => {
