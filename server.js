@@ -220,16 +220,32 @@ app.get("/my-orders/:userId", async (req, res) => {
 
 //search order functionality
 app.get("/search", async (req, res) => {
-  const query = req.query.query;
+  try {
+    const query = req.query.query;
 
-  const results = await Order.find({
-    service: { $regex: query, $options: "i" }
-  });
+    let results;
 
-  res.json({
-    success: true,
-    data: results
-  });
+    if (!query) {
+      // ✅ SHOW ALL
+      results = await Order.find().sort({ createdAt: -1 });
+    } else {
+      // 🔍 SEARCH
+      results = await Order.find({
+        service: { $regex: query, $options: "i" }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: results
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Search failed"
+    });
+  }
 });
 
 /* ---------- START SERVER ---------- */
