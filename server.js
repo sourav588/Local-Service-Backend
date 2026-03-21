@@ -138,7 +138,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ---------- PLACE ORDER (🔥 FIX ADDED) ---------- */
+/* ---------- PLACE ORDER ---------- */
 app.post("/order-service", async (req, res) => {
   try {
     const { userId, name, phone, address, service, price } = req.body;
@@ -199,7 +199,7 @@ app.get("/api/user/:id", async (req, res) => {
   }
 });
 
-/* ---------- GET USER ORDERS (🔥 BONUS) ---------- */
+/* ---------- GET USER ORDERS ---------- */
 app.get("/my-orders/:userId", async (req, res) => {
   try {
     const orders = await Order.find({ userId: req.params.userId }).sort({
@@ -218,7 +218,7 @@ app.get("/my-orders/:userId", async (req, res) => {
   }
 });
 
-//search order functionality
+/* ---------- SEARCH ---------- */
 app.get("/search", async (req, res) => {
   try {
     const query = req.query.query;
@@ -226,24 +226,65 @@ app.get("/search", async (req, res) => {
     let results;
 
     if (!query) {
-      // ✅ SHOW ALL
       results = await Order.find().sort({ createdAt: -1 });
     } else {
-      // 🔍 SEARCH
       results = await Order.find({
-        service: { $regex: query, $options: "i" }
+        service: { $regex: query, $options: "i" },
       });
     }
 
     res.json({
       success: true,
-      data: results
+      data: results,
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Search failed"
+      message: "Search failed",
+    });
+  }
+});
+
+/* ---------- ADDRESS SCHEMA ---------- */
+const addressSchema = new mongoose.Schema({
+  name: String,
+  mobile: String,
+  altMobile: String, // ✅ FIXED
+  pin: String,
+  address1: String,
+  address2: String,
+});
+
+const Address = mongoose.model("Address", addressSchema);
+
+/* ---------- SAVE ADDRESS (✅ FIXED) ---------- */
+app.post("/save-address", async (req, res) => {
+  try {
+    const newAddress = new Address(req.body);
+    await newAddress.save();
+
+    res.json({ success: true });
+  } catch (error) {
+    console.log("Save Address Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save address",
+    });
+  }
+});
+
+/* ---------- GET ADDRESSES ---------- */
+app.get("/get-addresses", async (req, res) => {
+  try {
+    const data = await Address.find().sort({ _id: -1 });
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch addresses",
     });
   }
 });
