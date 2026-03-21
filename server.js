@@ -248,8 +248,11 @@ app.get("/search", async (req, res) => {
 /* ---------- ADDRESS SCHEMA ---------- */
 const addressSchema = new mongoose.Schema({
   name: String,
-  mobile: String,
-  altMobile: String, // ✅ FIXED
+  mobile: {
+    type: String,
+    unique: true, // 🔥 prevents duplicates
+  },
+  altMobile: String,
   pin: String,
   address1: String,
   address2: String,
@@ -257,26 +260,10 @@ const addressSchema = new mongoose.Schema({
 
 const Address = mongoose.model("Address", addressSchema);
 
-/* ---------- SAVE ADDRESS (✅ FIXED) ---------- */
+/* ---------- SAVE OR UPDATE ADDRESS (🔥 FINAL FIX) ---------- */
 app.post("/save-address", async (req, res) => {
   try {
-    const newAddress = new Address(req.body);
-    await newAddress.save();
-
-    res.json({ success: true });
-  } catch (error) {
-    console.log("Save Address Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to save address",
-    });
-  }
-});
-
-
-app.post("/save-address", async (req, res) => {
-  try {
-    const { mobile } = req.body;
+    let { mobile } = req.body;
 
     if (!mobile) {
       return res.status(400).json({
@@ -285,29 +272,24 @@ app.post("/save-address", async (req, res) => {
       });
     }
 
-    // 🔥 CHECK IF ADDRESS EXISTS
-    const existing = await Address.findOne({ mobile });
+    // 🔥 CLEAN MOBILE
+    mobile = mobile.replace(/\D/g, "");
+    req.body.mobile = mobile;
 
-    if (existing) {
-      // ✅ UPDATE (not create new)
-      await Address.updateOne(
-        { mobile },
-        { $set: req.body }
-      );
-
-      return res.json({
-        success: true,
-        message: "Address updated ✅",
-      });
-    }
-
-    // ✅ CREATE NEW (only first time)
-    const newAddress = new Address(req.body);
-    await newAddress.save();
+    // 🔥 UPSERT (update if exists, create if not)
+    const address = await Address.findOneAndUpdate(
+      { mobile },
+      { $set: req.body },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
 
     res.json({
       success: true,
-      message: "Address saved ✅",
+      message: "Address saved/updated ✅",
+      data: address,
     });
 
   } catch (error) {
@@ -318,7 +300,6 @@ app.post("/save-address", async (req, res) => {
     });
   }
 });
-
 
 /* ---------- GET ADDRESSES ---------- */
 app.get("/get-addresses", async (req, res) => {
