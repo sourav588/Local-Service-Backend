@@ -273,6 +273,53 @@ app.post("/save-address", async (req, res) => {
   }
 });
 
+
+app.post("/save-address", async (req, res) => {
+  try {
+    const { mobile } = req.body;
+
+    if (!mobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile required",
+      });
+    }
+
+    // 🔥 CHECK IF ADDRESS EXISTS
+    const existing = await Address.findOne({ mobile });
+
+    if (existing) {
+      // ✅ UPDATE (not create new)
+      await Address.updateOne(
+        { mobile },
+        { $set: req.body }
+      );
+
+      return res.json({
+        success: true,
+        message: "Address updated ✅",
+      });
+    }
+
+    // ✅ CREATE NEW (only first time)
+    const newAddress = new Address(req.body);
+    await newAddress.save();
+
+    res.json({
+      success: true,
+      message: "Address saved ✅",
+    });
+
+  } catch (error) {
+    console.log("Save Address Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed",
+    });
+  }
+});
+
+
 /* ---------- GET ADDRESSES ---------- */
 app.get("/get-addresses", async (req, res) => {
   try {
