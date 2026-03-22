@@ -152,7 +152,14 @@ app.post("/order-service", async (req, res) => {
       });
     }
 
-    // 🔥 FIX: convert userId to ObjectId
+    // 🔥 IMPORTANT FIX
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId",
+      });
+    }
+
     const order = new Order({
       userId: new mongoose.Types.ObjectId(userId),
       name,
@@ -163,6 +170,8 @@ app.post("/order-service", async (req, res) => {
     });
 
     await order.save();
+
+    console.log("SAVED ORDER:", order); // 🔥 DEBUG
 
     res.json({
       success: true,
