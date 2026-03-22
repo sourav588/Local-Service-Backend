@@ -141,17 +141,20 @@ app.post("/login", async (req, res) => {
 /* ---------- PLACE ORDER ---------- */
 app.post("/order-service", async (req, res) => {
   try {
-    const { userId, name, phone, address, service, price } = req.body;
+    let { userId, name, phone, address, service, price } = req.body;
 
-    if (!name || !address || !service) {
+    console.log("ORDER BODY:", req.body); // 🔥 DEBUG
+
+    if (!userId || !name || !address || !service) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
+    // 🔥 FIX: convert userId to ObjectId
     const order = new Order({
-      userId,
+      userId: new mongoose.Types.ObjectId(userId),
       name,
       phone,
       address,
@@ -202,9 +205,9 @@ app.get("/api/user/:id", async (req, res) => {
 /* ---------- GET USER ORDERS ---------- */
 app.get("/my-orders/:userId", async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.params.userId }).sort({
-      createdAt: -1,
-    });
+    const orders = await Order.find({
+      userId: new mongoose.Types.ObjectId(req.params.userId), // 🔥 FIX
+    }).sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -250,7 +253,7 @@ const addressSchema = new mongoose.Schema({
   name: String,
   mobile: {
     type: String,
-    unique: true, // 🔥 prevents duplicates
+    unique: true,
   },
   altMobile: String,
   pin: String,
@@ -260,7 +263,7 @@ const addressSchema = new mongoose.Schema({
 
 const Address = mongoose.model("Address", addressSchema);
 
-/* ---------- SAVE OR UPDATE ADDRESS (🔥 FINAL FIX) ---------- */
+/* ---------- SAVE OR UPDATE ADDRESS ---------- */
 app.post("/save-address", async (req, res) => {
   try {
     let { mobile } = req.body;
@@ -272,18 +275,13 @@ app.post("/save-address", async (req, res) => {
       });
     }
 
-    // 🔥 CLEAN MOBILE
     mobile = mobile.replace(/\D/g, "");
     req.body.mobile = mobile;
 
-    // 🔥 UPSERT (update if exists, create if not)
     const address = await Address.findOneAndUpdate(
       { mobile },
       { $set: req.body },
-      {
-        new: true,
-        upsert: true,
-      }
+      { new: true, upsert: true }
     );
 
     res.json({
@@ -291,7 +289,6 @@ app.post("/save-address", async (req, res) => {
       message: "Address saved/updated ✅",
       data: address,
     });
-
   } catch (error) {
     console.log("Save Address Error:", error);
     res.status(500).json({
@@ -317,20 +314,23 @@ app.get("/get-addresses", async (req, res) => {
   }
 });
 
-
-//order-History Page
-// GET USER ORDERS
+/* ---------- GET ORDERS (MAIN) ---------- */
 app.get("/get-orders/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
+    console.log("FETCH ORDERS FOR:", userId); // 🔥 DEBUG
+
+    const orders = await Order.find({
+      userId: new mongoose.Types.ObjectId(userId),
+    }).sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
       orders,
     });
   } catch (error) {
+    console.log("GET ORDERS ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch orders",
