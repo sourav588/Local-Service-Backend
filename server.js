@@ -143,7 +143,7 @@ app.post("/order-service", async (req, res) => {
   try {
     let { userId, name, phone, address, service, price } = req.body;
 
-    console.log("ORDER BODY:", req.body); // 🔥 DEBUG
+    console.log("📦 ORDER BODY:", req.body);
 
     if (!userId || !name || !address || !service) {
       return res.status(400).json({
@@ -152,7 +152,14 @@ app.post("/order-service", async (req, res) => {
       });
     }
 
-    // 🔥 FIX: convert userId to ObjectId
+    // 🔥 VALIDATE OBJECT ID
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId",
+      });
+    }
+
     const order = new Order({
       userId: new mongoose.Types.ObjectId(userId),
       name,
@@ -167,9 +174,10 @@ app.post("/order-service", async (req, res) => {
     res.json({
       success: true,
       message: "Order placed successfully",
+      order,
     });
   } catch (error) {
-    console.log("Order Error:", error);
+    console.log("❌ Order Error:", error);
     res.status(500).json({
       success: false,
       message: "Order failed",
@@ -203,17 +211,29 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 /* ---------- GET USER ORDERS ---------- */
-app.get("/my-orders/:userId", async (req, res) => {
+app.get("/get-orders/:userId", async (req, res) => {
   try {
+    const { userId } = req.params;
+
+    console.log("📥 FETCH ORDERS FOR:", userId);
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId",
+      });
+    }
+
     const orders = await Order.find({
-      userId: new mongoose.Types.ObjectId(req.params.userId), // 🔥 FIX
+      userId: new mongoose.Types.ObjectId(userId),
     }).sort({ createdAt: -1 });
 
     res.json({
       success: true,
-      data: orders,
+      orders,
     });
-  } catch (err) {
+  } catch (error) {
+    console.log("❌ GET ORDERS ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch orders",
@@ -251,10 +271,7 @@ app.get("/search", async (req, res) => {
 /* ---------- ADDRESS SCHEMA ---------- */
 const addressSchema = new mongoose.Schema({
   name: String,
-  mobile: {
-    type: String,
-    unique: true,
-  },
+  mobile: { type: String, unique: true },
   altMobile: String,
   pin: String,
   address1: String,
@@ -263,7 +280,7 @@ const addressSchema = new mongoose.Schema({
 
 const Address = mongoose.model("Address", addressSchema);
 
-/* ---------- SAVE OR UPDATE ADDRESS ---------- */
+/* ---------- SAVE ADDRESS ---------- */
 app.post("/save-address", async (req, res) => {
   try {
     let { mobile } = req.body;
@@ -286,11 +303,11 @@ app.post("/save-address", async (req, res) => {
 
     res.json({
       success: true,
-      message: "Address saved/updated ✅",
+      message: "Address saved ✅",
       data: address,
     });
   } catch (error) {
-    console.log("Save Address Error:", error);
+    console.log("Address Error:", error);
     res.status(500).json({
       success: false,
       message: "Failed",
@@ -302,6 +319,7 @@ app.post("/save-address", async (req, res) => {
 app.get("/get-addresses", async (req, res) => {
   try {
     const data = await Address.find().sort({ _id: -1 });
+
     res.json({
       success: true,
       data,
@@ -310,30 +328,6 @@ app.get("/get-addresses", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch addresses",
-    });
-  }
-});
-
-/* ---------- GET ORDERS (MAIN) ---------- */
-app.get("/get-orders/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    console.log("FETCH ORDERS FOR:", userId); // 🔥 DEBUG
-
-    const orders = await Order.find({
-      userId: new mongoose.Types.ObjectId(userId),
-    }).sort({ createdAt: -1 });
-
-    res.status(200).json({
-      success: true,
-      orders,
-    });
-  } catch (error) {
-    console.log("GET ORDERS ERROR:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch orders",
     });
   }
 });
