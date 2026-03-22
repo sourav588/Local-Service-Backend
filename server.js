@@ -138,30 +138,36 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ---------- PLACE ORDER ---------- */
+/* ---------- PLACE ORDER (🔥 FIXED) ---------- */
 app.post("/order-service", async (req, res) => {
   try {
     let { userId, name, phone, address, service, price } = req.body;
 
-    console.log("ORDER BODY:", req.body); // 🔥 DEBUG
+    console.log("🔥 ORDER BODY RECEIVED:", req.body);
 
+    // ❌ check missing
     if (!userId || !name || !address || !service) {
+      console.log("❌ Missing fields");
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
-    // 🔥 IMPORTANT FIX
+    // ❌ invalid id
     if (!mongoose.Types.ObjectId.isValid(userId)) {
+      console.log("❌ Invalid userId:", userId);
       return res.status(400).json({
         success: false,
         message: "Invalid userId",
       });
     }
 
+    // ✅ convert properly
+    const objectUserId = new mongoose.Types.ObjectId(userId);
+
     const order = new Order({
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: objectUserId,
       name,
       phone,
       address,
@@ -169,16 +175,17 @@ app.post("/order-service", async (req, res) => {
       price: price || 0,
     });
 
-    await order.save();
+    const saved = await order.save();
 
-    console.log("SAVED ORDER:", order); // 🔥 DEBUG
+    console.log("✅ ORDER SAVED:", saved);
 
     res.json({
       success: true,
       message: "Order placed successfully",
     });
+
   } catch (error) {
-    console.log("Order Error:", error);
+    console.log("❌ ORDER ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Order failed",
@@ -211,135 +218,33 @@ app.get("/api/user/:id", async (req, res) => {
   }
 });
 
-/* ---------- GET USER ORDERS ---------- */
-app.get("/my-orders/:userId", async (req, res) => {
-  try {
-    const orders = await Order.find({
-      userId: new mongoose.Types.ObjectId(req.params.userId), // 🔥 FIX
-    }).sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      data: orders,
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch orders",
-    });
-  }
-});
-
-/* ---------- SEARCH ---------- */
-app.get("/search", async (req, res) => {
-  try {
-    const query = req.query.query;
-
-    let results;
-
-    if (!query) {
-      results = await Order.find().sort({ createdAt: -1 });
-    } else {
-      results = await Order.find({
-        service: { $regex: query, $options: "i" },
-      });
-    }
-
-    res.json({
-      success: true,
-      data: results,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Search failed",
-    });
-  }
-});
-
-/* ---------- ADDRESS SCHEMA ---------- */
-const addressSchema = new mongoose.Schema({
-  name: String,
-  mobile: {
-    type: String,
-    unique: true,
-  },
-  altMobile: String,
-  pin: String,
-  address1: String,
-  address2: String,
-});
-
-const Address = mongoose.model("Address", addressSchema);
-
-/* ---------- SAVE OR UPDATE ADDRESS ---------- */
-app.post("/save-address", async (req, res) => {
-  try {
-    let { mobile } = req.body;
-
-    if (!mobile) {
-      return res.status(400).json({
-        success: false,
-        message: "Mobile required",
-      });
-    }
-
-    mobile = mobile.replace(/\D/g, "");
-    req.body.mobile = mobile;
-
-    const address = await Address.findOneAndUpdate(
-      { mobile },
-      { $set: req.body },
-      { new: true, upsert: true }
-    );
-
-    res.json({
-      success: true,
-      message: "Address saved/updated ✅",
-      data: address,
-    });
-  } catch (error) {
-    console.log("Save Address Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed",
-    });
-  }
-});
-
-/* ---------- GET ADDRESSES ---------- */
-app.get("/get-addresses", async (req, res) => {
-  try {
-    const data = await Address.find().sort({ _id: -1 });
-    res.json({
-      success: true,
-      data,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch addresses",
-    });
-  }
-});
-
-/* ---------- GET ORDERS (MAIN) ---------- */
+/* ---------- GET ORDERS ---------- */
 app.get("/get-orders/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
 
-    console.log("FETCH ORDERS FOR:", userId); // 🔥 DEBUG
+    console.log("🔥 FETCH FOR USER:", userId);
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId",
+      });
+    }
 
     const orders = await Order.find({
       userId: new mongoose.Types.ObjectId(userId),
     }).sort({ createdAt: -1 });
 
-    res.status(200).json({
+    console.log("✅ ORDERS FOUND:", orders.length);
+
+    res.json({
       success: true,
       orders,
     });
+
   } catch (error) {
-    console.log("GET ORDERS ERROR:", error);
+    console.log("❌ FETCH ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch orders",
