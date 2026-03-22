@@ -317,6 +317,27 @@ app.get("/get-addresses", async (req, res) => {
   }
 });
 
+
+//order-History Page
+// GET USER ORDERS
+app.get("/get-orders/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      orders,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch orders",
+    });
+  }
+});
+
 /* ---------- START SERVER ---------- */
 const PORT = process.env.PORT || 4000;
 
