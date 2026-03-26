@@ -14,7 +14,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* ---------- MongoDB Connection (FIXED DB NAME) ---------- */
+/* ---------- MongoDB Connection ---------- */
 const MONGO_URI =
   process.env.MONGODB_URI ||
   "mongodb+srv://sourav801600_db_user:Cc5CRknoqFueF05D@myservise.91oxfrm.mongodb.net/localServiceDB";
@@ -32,7 +32,7 @@ mongoose
 
 /* ---------- ROOT ---------- */
 app.get("/", (req, res) => {
-  res.json({ message: "API Running" });
+  res.json({ message: "API Running 🚀" });
 });
 
 /* ---------- REGISTER ---------- */
@@ -41,22 +41,28 @@ app.post("/register", async (req, res) => {
     let { name, email, phone, password, address } = req.body;
 
     if (!name || !email || !phone || !password) {
-      return res.status(400).json({ success: false, message: "All fields required" });
+      return res.status(400).json({
+        success: false,
+        message: "All fields required",
+      });
     }
 
     email = email.trim().toLowerCase();
 
     const exist = await User.findOne({ email });
     if (exist) {
-      return res.status(400).json({ success: false, message: "Email already exists" });
+      return res.status(400).json({
+        success: false,
+        message: "Email already exists",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = new User({
-      name,
+      name: name.trim(),
       email,
-      phone,
+      phone: phone.trim(),
       password: hashedPassword,
       address: address || "",
     });
@@ -83,13 +89,19 @@ app.post("/login", async (req, res) => {
     const user = await User.findOne({ email }).select("+password");
 
     if (!user) {
-      return res.status(401).json({ success: false, message: "Invalid email" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email",
+      });
     }
 
     const match = await bcrypt.compare(password, user.password);
 
     if (!match) {
-      return res.status(401).json({ success: false, message: "Invalid password" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid password",
+      });
     }
 
     const token = jwt.sign(
@@ -114,16 +126,14 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ---------- PLACE ORDER (STRICT SAVE CHECK) ---------- */
+/* ---------- PLACE ORDER (FIXED) ---------- */
 app.post("/order-service", async (req, res) => {
   try {
     console.log("🔥 FULL BODY:", req.body);
 
-    const { userId, name, phone, address, service, price } = req.body;
+    let { userId, name, phone, address, service, price } = req.body;
 
-    console.log("🔥 userId received:", userId);
-
-    // ❌ STOP if userId missing
+    /* ---------- VALIDATION ---------- */
     if (!userId) {
       return res.status(400).json({
         success: false,
@@ -138,12 +148,17 @@ app.post("/order-service", async (req, res) => {
       });
     }
 
+    /* 🔥 CONVERT STRING → ObjectId */
+    const objectUserId = new mongoose.Types.ObjectId(userId);
+
+    console.log("✅ CONVERTED USER ID:", objectUserId);
+
     const order = new Order({
-      userId, // ✅ IMPORTANT
-      name,
-      phone,
-      address,
-      service,
+      userId: objectUserId,
+      name: name?.trim() || "Unknown",
+      phone: phone?.trim() || "0000000000",
+      address: address?.trim(),
+      service: service?.trim(),
       price: Number(price) || 0,
     });
 
@@ -154,8 +169,8 @@ app.post("/order-service", async (req, res) => {
     res.json({
       success: true,
       message: "Order placed successfully",
+      order,
     });
-
   } catch (error) {
     console.log("❌ ORDER ERROR:", error);
     res.status(500).json({
@@ -164,7 +179,8 @@ app.post("/order-service", async (req, res) => {
     });
   }
 });
-/* ---------- GET USER ORDERS ---------- */
+
+/* ---------- GET USER ORDERS (FIXED) ---------- */
 app.get("/get-orders/:userId", async (req, res) => {
   try {
     const userId = req.params.userId;
@@ -178,12 +194,13 @@ app.get("/get-orders/:userId", async (req, res) => {
       });
     }
 
+    const objectUserId = new mongoose.Types.ObjectId(userId);
+
     const orders = await Order.find({
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: objectUserId,
     }).sort({ createdAt: -1 });
 
     console.log("📦 FOUND ORDERS:", orders.length);
-    console.log("📦 FROM DB:", mongoose.connection.name);
 
     res.json({
       success: true,
@@ -198,7 +215,7 @@ app.get("/get-orders/:userId", async (req, res) => {
   }
 });
 
-/* ---------- DEBUG ROUTE (VERY IMPORTANT) ---------- */
+/* ---------- DEBUG ROUTE ---------- */
 app.get("/debug-db", async (req, res) => {
   try {
     const dbName = mongoose.connection.name;
