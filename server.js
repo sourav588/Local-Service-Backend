@@ -14,20 +14,23 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* ---------- MongoDB Connection ---------- */
+/* ---------- MongoDB Connection (FIXED DB NAME) ---------- */
 const MONGO_URI =
   process.env.MONGODB_URI ||
-  "mongodb+srv://sourav801600_db_user:Cc5CRknoqFueF05D@myservise.91oxfrm.mongodb.net/?appName=myservise";
+  "mongodb+srv://sourav801600_db_user:Cc5CRknoqFueF05D@myservise.91oxfrm.mongodb.net/localServiceDB";
 
 mongoose
   .connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
+  .then(() => {
+    console.log("✅ MongoDB Connected");
+    console.log("🌍 DATABASE NAME:", mongoose.connection.name);
+  })
   .catch((err) => {
     console.log("❌ MongoDB Error:", err);
     process.exit(1);
   });
 
-/* ---------- Test Route ---------- */
+/* ---------- ROOT ---------- */
 app.get("/", (req, res) => {
   res.json({ message: "API Running" });
 });
@@ -38,20 +41,14 @@ app.post("/register", async (req, res) => {
     let { name, email, phone, password, address } = req.body;
 
     if (!name || !email || !phone || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
-      });
+      return res.status(400).json({ success: false, message: "All fields required" });
     }
 
     email = email.trim().toLowerCase();
 
     const exist = await User.findOne({ email });
     if (exist) {
-      return res.status(400).json({
-        success: false,
-        message: "Email already registered",
-      });
+      return res.status(400).json({ success: false, message: "Email already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -68,15 +65,11 @@ app.post("/register", async (req, res) => {
 
     res.json({
       success: true,
-      message: "User registered successfully",
       userId: user._id,
     });
   } catch (err) {
-    console.log("Register Error:", err);
-    res.status(500).json({
-      success: false,
-      message: "Registration failed",
-    });
+    console.log("❌ Register Error:", err);
+    res.status(500).json({ success: false });
   }
 });
 
@@ -85,32 +78,18 @@ app.post("/login", async (req, res) => {
   try {
     let { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email & password required",
-      });
-    }
-
     email = email.trim().toLowerCase();
-    password = password.trim();
 
     const user = await User.findOne({ email }).select("+password");
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
+      return res.status(401).json({ success: false, message: "Invalid email" });
     }
 
     const match = await bcrypt.compare(password, user.password);
 
     if (!match) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
+      return res.status(401).json({ success: false, message: "Invalid password" });
     }
 
     const token = jwt.sign(
@@ -130,44 +109,35 @@ app.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.log("Login Error:", err);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    console.log("❌ Login Error:", err);
+    res.status(500).json({ success: false });
   }
 });
 
-/* ---------- PLACE ORDER (🔥 FIXED) ---------- */
+/* ---------- PLACE ORDER (STRICT SAVE CHECK) ---------- */
 app.post("/order-service", async (req, res) => {
   try {
     let { userId, name, phone, address, service, price } = req.body;
 
-    console.log("🔥 ORDER BODY RECEIVED:", req.body);
+    console.log("📥 ORDER BODY:", req.body);
 
-    // ❌ check missing
     if (!userId || !name || !address || !service) {
-      console.log("❌ Missing fields");
       return res.status(400).json({
         success: false,
-        message: "Missing required fields",
+        message: "Missing fields",
       });
     }
 
-    // ❌ invalid id
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      console.log("❌ Invalid userId:", userId);
+      console.log("❌ INVALID USER ID:", userId);
       return res.status(400).json({
         success: false,
         message: "Invalid userId",
       });
     }
 
-    // ✅ convert properly
-    const objectUserId = new mongoose.Types.ObjectId(userId);
-
     const order = new Order({
-      userId: objectUserId,
+      userId: new mongoose.Types.ObjectId(userId),
       name,
       phone,
       address,
@@ -175,42 +145,28 @@ app.post("/order-service", async (req, res) => {
       price: price || 0,
     });
 
-    const saved = await order.save();
+    console.log("🟡 BEFORE SAVE");
 
-    console.log("✅ ORDER SAVED:", saved);
+    const savedOrder = await order.save();
+
+    if (!savedOrder || !savedOrder._id) {
+      console.log("❌ SAVE FAILED");
+      return res.status(500).json({
+        success: false,
+        message: "Order not saved",
+      });
+    }
+
+    console.log("🟢 SAVED ORDER:", savedOrder);
+    console.log("🟢 SAVED IN DB:", mongoose.connection.name);
 
     res.json({
       success: true,
       message: "Order placed successfully",
+      order: savedOrder,
     });
-
   } catch (error) {
     console.log("❌ ORDER ERROR:", error);
-    res.status(500).json({
-      success: false,
-      message: "Order failed",
-    });
-  }
-});
-
-/* ---------- GET USER ---------- */
-app.get("/api/user/:id", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select("-password");
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    res.json({
-      success: true,
-      user,
-    });
-  } catch (err) {
-    console.log("User Fetch Error:", err);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -218,12 +174,12 @@ app.get("/api/user/:id", async (req, res) => {
   }
 });
 
-/* ---------- GET ORDERS ---------- */
+/* ---------- GET USER ORDERS ---------- */
 app.get("/get-orders/:userId", async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.userId;
 
-    console.log("🔥 FETCH FOR USER:", userId);
+    console.log("📤 FETCH USER ID:", userId);
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
@@ -236,19 +192,38 @@ app.get("/get-orders/:userId", async (req, res) => {
       userId: new mongoose.Types.ObjectId(userId),
     }).sort({ createdAt: -1 });
 
-    console.log("✅ ORDERS FOUND:", orders.length);
+    console.log("📦 FOUND ORDERS:", orders.length);
+    console.log("📦 FROM DB:", mongoose.connection.name);
 
     res.json({
       success: true,
       orders,
     });
-
   } catch (error) {
-    console.log("❌ FETCH ERROR:", error);
+    console.log("❌ GET ORDERS ERROR:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch orders",
+      message: "Server error",
     });
+  }
+});
+
+/* ---------- DEBUG ROUTE (VERY IMPORTANT) ---------- */
+app.get("/debug-db", async (req, res) => {
+  try {
+    const dbName = mongoose.connection.name;
+    const orders = await Order.find();
+
+    console.log("🌍 CURRENT DB:", dbName);
+    console.log("📦 TOTAL ORDERS:", orders.length);
+
+    res.json({
+      db: dbName,
+      totalOrders: orders.length,
+      orders,
+    });
+  } catch (err) {
+    res.json({ error: err.message });
   }
 });
 
