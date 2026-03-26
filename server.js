@@ -117,63 +117,53 @@ app.post("/login", async (req, res) => {
 /* ---------- PLACE ORDER (STRICT SAVE CHECK) ---------- */
 app.post("/order-service", async (req, res) => {
   try {
-    let { userId, name, phone, address, service, price } = req.body;
+    console.log("🔥 FULL BODY:", req.body);
 
-    console.log("📥 ORDER BODY:", req.body);
+    const { userId, name, phone, address, service, price } = req.body;
 
-    if (!userId || !name || !address || !service) {
+    console.log("🔥 userId received:", userId);
+
+    // ❌ STOP if userId missing
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: "Missing fields",
+        message: "userId is REQUIRED ❌",
       });
     }
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      console.log("❌ INVALID USER ID:", userId);
       return res.status(400).json({
         success: false,
-        message: "Invalid userId",
+        message: "Invalid userId ❌",
       });
     }
 
     const order = new Order({
-      userId: new mongoose.Types.ObjectId(userId),
+      userId, // ✅ IMPORTANT
       name,
       phone,
       address,
       service,
-      price: price || 0,
+      price: Number(price) || 0,
     });
 
-    console.log("🟡 BEFORE SAVE");
+    await order.save();
 
-    const savedOrder = await order.save();
-
-    if (!savedOrder || !savedOrder._id) {
-      console.log("❌ SAVE FAILED");
-      return res.status(500).json({
-        success: false,
-        message: "Order not saved",
-      });
-    }
-
-    console.log("🟢 SAVED ORDER:", savedOrder);
-    console.log("🟢 SAVED IN DB:", mongoose.connection.name);
+    console.log("✅ SAVED ORDER:", order);
 
     res.json({
       success: true,
       message: "Order placed successfully",
-      order: savedOrder,
     });
+
   } catch (error) {
     console.log("❌ ORDER ERROR:", error);
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Order failed",
     });
   }
 });
-
 /* ---------- GET USER ORDERS ---------- */
 app.get("/get-orders/:userId", async (req, res) => {
   try {
